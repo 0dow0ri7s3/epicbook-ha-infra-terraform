@@ -1,0 +1,24 @@
+# Local Directory containing downloaded provider binaries
+.terraform/
+
+# Hide local state files if you ever run local testing
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*
+
+# Exclude all variable files containing sensitive passwords/secrets
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
