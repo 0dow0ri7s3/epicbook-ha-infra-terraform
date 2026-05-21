@@ -69,27 +69,36 @@ resource "aws_launch_template" "app" {
 
   vpc_security_group_ids = [var.app_sg_id]
 
-  # Optional user data to bootstrap the instance with Docker or Node.js later
+  # Attach the Identity Profile created in Layer 2
+  iam_instance_profile {
+    arn = aws_iam_instance_profile.ec2_profile.arn
+  }
+
+  # Script to provision the server at boot time
   user_data = base64encode(<<-EOF
               #!/bin/bash
-              sudo apt-get update -y
-              sudo apt-get install nginx -y
+              # Stop execution if any command fails
+              set -e
 
-              # Change default Nginx port from 80 to your custom application port
+              # Update system and install the Docker engine
+              apt-get update -y
+              apt-get install -y docker.io
+              systemctl start docker
+              systemctl enable docker
+
               sudo sed -i 's/listen 80 default_server;/listen ${var.app_port} default_server;/' /etc/nginx/sites-available/default
               sudo sed -i 's/listen \[::\]:80 default_server;/listen \[::\]:${var.app_port} default_server;/' /etc/nginx/sites-available/default
 
               sudo systemctl restart nginx
               echo "<h1>EpicBook Dev Infra is Live on Port ${var.app_port}</h1>" | sudo tee /var/www/html/index.html
+
+              # Ensure the default ubuntu user can interact with Docker safely
+              usermod -aG docker ubuntu
               EOF
   )
 
   lifecycle {
     create_before_destroy = true
-  }
-
-  tags = {
-    Name = "${var.environment}-launch-template"
   }
 }
 
@@ -114,4 +123,45 @@ resource "aws_autoscaling_group" "app" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+resource "aws_ecr_repository" "app" {
+  name                 = "${var.environment}-epicbook-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "KMS"
+  }
+}
+
+resource "aws_iam_role" "ec2_profile" {
+  name = "${var.environment}-epicbook-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_read" {
+  role       = aws_iam_role.ec2_profile.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_profile.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.environment}-epicbook-instance-profile"
+  role = aws_iam_role.ec2_profile.name
 }
