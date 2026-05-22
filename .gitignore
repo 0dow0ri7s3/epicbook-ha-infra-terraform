@@ -1,24 +1,20 @@
-# Local Directory containing downloaded provider binaries
+cat << 'EOF' > .gitignore
+# Ignore local Terraform directories and files
 .terraform/
-
-# Hide local state files if you ever run local testing
 *.tfstate
 *.tfstate.*
-
-# Crash logs
-crash.log
-crash.*
-
-# Exclude all variable files containing sensitive passwords/secrets
 *.tfvars
 *.tfvars.json
 
-# Override files
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
+# Ignore execution plans
+*-plan
+epic-plan
 
-# Ignore CLI configuration files
-.terraformrc
-terraform.rc
+# Ignore CLI configuration and provider caches
+.terraform.lock.hcl
+.aws/
+aws/
+
+# Ignore OS files
+.DS_Store
+EOF
